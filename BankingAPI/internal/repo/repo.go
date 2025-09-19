@@ -19,10 +19,9 @@ var (
 	ErrAccountInactive = errors.New("account inactive")
 )
 
-// Repo provides high-level operations on models using the storage.
 type Repo struct {
 	store *storage.InMemoryStore
-	mu    sync.Mutex // used for operations that must be atomic across multiple records (transfers)
+	mu    sync.Mutex // to ensure atomic operations across multiple accounts
 }
 
 func (r *Repo) HandleFunc(s string, register func(w http.ResponseWriter, r *http.Request)) {
@@ -33,7 +32,6 @@ func NewRepo(s *storage.InMemoryStore) *Repo {
 	return &Repo{store: s}
 }
 
-// CreateUser stores a new user with hashed password set externally
 func (r *Repo) CreateUser(ctx context.Context, u *model.User) (*model.User, error) {
 	r.store.Mu.Lock()
 	defer r.store.Mu.Unlock()
@@ -70,7 +68,6 @@ func (r *Repo) GetUserByID(ctx context.Context, id string) (*model.User, error) 
 	return u, nil
 }
 
-// CreateAccount creates an account tied to a user
 func (r *Repo) CreateAccount(ctx context.Context, a *model.Account) (*model.Account, error) {
 	r.store.Mu.Lock()
 	defer r.store.Mu.Unlock()
@@ -126,7 +123,7 @@ func (r *Repo) UpdateAccount(ctx context.Context, id string, name *string, isAct
 	if isActive != nil {
 		a.IsActive = *isActive
 		if !a.IsActive {
-			// when user deactivates account, nothing else needed
+
 		}
 	}
 	a.UpdatedAt = time.Now()
@@ -146,7 +143,6 @@ func (r *Repo) DeleteAccount(ctx context.Context, id string) error {
 	return nil
 }
 
-// Deposit into an account (only if active)
 func (r *Repo) Deposit(ctx context.Context, accountID string, amount int64, meta map[string]interface{}) (*model.Transaction, error) {
 	if amount <= 0 {
 		return nil, errors.New("amount must be positive")
@@ -167,7 +163,6 @@ func (r *Repo) Deposit(ctx context.Context, accountID string, amount int64, meta
 	return t, nil
 }
 
-// Withdraw from an account
 func (r *Repo) Withdraw(ctx context.Context, accountID string, amount int64, meta map[string]interface{}) (*model.Transaction, error) {
 	if amount <= 0 {
 		return nil, errors.New("amount must be positive")
@@ -191,7 +186,6 @@ func (r *Repo) Withdraw(ctx context.Context, accountID string, amount int64, met
 	return t, nil
 }
 
-// Transfer between accounts; ensures both active and atomic update
 func (r *Repo) Transfer(ctx context.Context, fromID, toID string, amount int64, meta map[string]interface{}) (*model.Transaction, *model.Transaction, error) {
 	if amount <= 0 {
 		return nil, nil, errors.New("amount must be positive")
@@ -217,7 +211,7 @@ func (r *Repo) Transfer(ctx context.Context, fromID, toID string, amount int64, 
 	if from.Balance < amount {
 		return nil, nil, ErrInsufficient
 	}
-	// perform transfer
+
 	from.Balance -= amount
 	to.Balance += amount
 	from.UpdatedAt = time.Now()
@@ -230,44 +224,42 @@ func (r *Repo) Transfer(ctx context.Context, fromID, toID string, amount int64, 
 	return txnOut, txnIn, nil
 }
 
-// List transactions for a user's accounts with filters + pagination
-func (r *Repo) ListTransactions(ctx context.Context, userID string, accountID *string, typ *model.TransactionType, from, to *time.Time, limit, offset int) ([]*model.Transaction, error) {
-	r.store.Mu.RLock()
-	defer r.store.Mu.RUnlock()
-	out := []*model.Transaction{}
-	// build set of user's active accounts
-	acctSet := map[string]struct{}{}
-	for _, a := range r.store.Accounts {
-		if a.UserID == userID {
-			acctSet[a.ID] = struct{}{}
-		}
-	}
-	for _, t := range r.store.Transactions {
-		if _, ok := acctSet[t.AccountID]; !ok {
-			continue
-		}
-		if accountID != nil && t.AccountID != *accountID {
-			continue
-		}
-		if typ != nil && t.Type != *typ {
-			continue
-		}
-		if from != nil && t.CreatedAt.Before(*from) {
-			continue
-		}
-		if to != nil && t.CreatedAt.After(*to) {
-			continue
-		}
-		out = append(out, t)
-	}
-	// simple pagination
-	start := offset
-	if start > len(out) {
-		start = len(out)
-	}
-	end := start + limit
-	if end > len(out) || limit == 0 {
-		end = len(out)
-	}
-	return out[start:end], nil
-}
+// func (r *Repo) ListTransactions(ctx context.Context, userID string, accountID *string, typ *model.TransactionType, from, to *time.Time, limit, offset int) ([]*model.Transaction, error) {
+// 	r.store.Mu.RLock()
+// 	defer r.store.Mu.RUnlock()
+// 	out := []*model.Transaction{}
+// 	// build set of user's active accounts
+// 	acctSet := map[string]struct{}{}
+// 	for _, a := range r.store.Accounts {
+// 		if a.UserID == userID {
+// 			acctSet[a.ID] = struct{}{}
+// 		}
+// 	}
+// 	for _, t := range r.store.Transactions {
+// 		if _, ok := acctSet[t.AccountID]; !ok {
+// 			continue
+// 		}
+// 		if accountID != nil && t.AccountID != *accountID {
+// 			continue
+// 		}
+// 		if typ != nil && t.Type != *typ {
+// 			continue
+// 		}
+// 		if from != nil && t.CreatedAt.Before(*from) {
+// 			continue
+// 		}
+// 		if to != nil && t.CreatedAt.After(*to) {
+// 			continue
+// 		}
+// 		out = append(out, t)
+// 	}
+// 	start := offset
+// 	if start > len(out) {
+// 		start = len(out)
+// 	}
+// 	end := start + limit
+// 	if end > len(out) || limit == 0 {
+// 		end = len(out)
+// 	}
+// 	return out[start:end], nil
+// }
