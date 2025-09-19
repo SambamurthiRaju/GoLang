@@ -1,0 +1,429 @@
+basePath: /
+definitions:
+  auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  httpservers.amountReq:
+    properties:
+      amount:
+        type: integer
+      meta:
+        additionalProperties: true
+        type: object
+    type: object
+  httpservers.createAccountReq:
+    properties:
+      currency:
+        type: string
+      name:
+        type: string
+    type: object
+  httpservers.transferReq:
+    properties:
+      amount:
+        type: integer
+      from_account_id:
+        type: string
+      meta:
+        additionalProperties: true
+        type: object
+      to_account_id:
+        type: string
+    type: object
+  httpservers.updateAccountReq:
+    properties:
+      is_active:
+        type: boolean
+      name:
+        type: string
+    type: object
+  model.Account:
+    properties:
+      balance:
+        type: integer
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  model.Transaction:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      meta:
+        additionalProperties: true
+        type: object
+      type:
+        $ref: '#/definitions/model.TransactionType'
+    type: object
+  model.TransactionType:
+    enum:
+    - DEPOSIT
+    - WITHDRAW
+    - TRANSFER
+    type: string
+    x-enum-varnames:
+    - Deposit
+    - Withdraw
+    - Transfer
+  model.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Simple in-memory banking API with JWT authentication.
+  title: Banking API
+  version: "1.0"
+paths:
+  /accounts:
+    get:
+      parameters:
+      - description: currency filter
+        in: query
+        name: currency
+        type: string
+      - description: min balance (minor units)
+        in: query
+        name: min_balance
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Account'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List accounts
+      tags:
+      - accounts
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: create account
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpservers.createAccountReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Account'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create account
+      tags:
+      - accounts
+  /accounts/{id}:
+    delete:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Soft delete account
+      tags:
+      - accounts
+    get:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Account'
+        "404":
+          description: Not Found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get account
+      tags:
+      - accounts
+    put:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpservers.updateAccountReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Account'
+      security:
+      - BearerAuth: []
+      summary: Update account
+      tags:
+      - accounts
+  /accounts/{id}/deposit:
+    post:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: deposit amount
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpservers.amountReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Transaction'
+      security:
+      - BearerAuth: []
+      summary: Deposit
+      tags:
+      - accounts
+  /accounts/{id}/withdraw:
+    post:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: withdraw amount
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpservers.amountReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Transaction'
+      security:
+      - BearerAuth: []
+      summary: Withdraw
+      tags:
+      - accounts
+  /accounts/transactions:
+    get:
+      parameters:
+      - description: account id
+        in: query
+        name: account_id
+        type: string
+      - description: DEPOSIT|WITHDRAW
+        in: query
+        name: type
+        type: string
+      - description: from date RFC3339
+        in: query
+        name: from
+        type: string
+      - description: to date RFC3339
+        in: query
+        name: to
+        type: string
+      - description: limit
+        in: query
+        name: limit
+        type: integer
+      - description: offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Transaction'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List transactions
+      tags:
+      - transactions
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: login
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Login user
+      tags:
+      - auth
+  /auth/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: register
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Register user
+      tags:
+      - auth
+  /transfers:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: transfer
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpservers.transferReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/model.Transaction'
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Transfer
+      tags:
+      - transfers
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
