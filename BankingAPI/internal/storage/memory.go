@@ -11,8 +11,7 @@ type InMemoryStore struct {
 	Users        map[string]*model.User
 	Accounts     map[string]*model.Account
 	Transactions map[string]*model.Transaction
-	// helper maps
-	EmailIndex map[string]string // email -> userID
+	EmailIndex   map[string]string // email -> userID
 }
 
 func NewInMemoryStore() *InMemoryStore {
